@@ -14,7 +14,7 @@ TARGET_OTA_ASSERT_DEVICE := blaze_tablet,otter2
 
 # Kernel Build
 TARGET_KERNEL_SOURCE := kernel/amazon/otter-common
-TARGET_KERNEL_CONFIG := otter2_android_defconfig
+TARGET_KERNEL_CONFIG := otter2_phablet_defconfig
 
 # Filesystem
 BOARD_BOOTIMAGE_PARTITION_SIZE := 8388608
