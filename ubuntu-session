@@ -1,0 +1,136 @@
+#!/bin/bash
+
+################################################################################
+# Copyright 2012-2013 Canonical Ltd.
+#
+# This program is free software: you can redistribute it and/or modify it 
+# under the terms of the GNU General Public License version 3, as published 
+# by the Free Software Foundation.
+# 
+# This program is distributed in the hope that it will be useful, but 
+# WITHOUT ANY WARRANTY; without even the implied warranties of 
+# MERCHANTABILITY, SATISFACTORY QUALITY, or FITNESS FOR A PARTICULAR 
+# PURPOSE.  See the GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License along 
+# with this program.  If not, see <http://www.gnu.org/licenses/>.
+################################################################################
+
+export HOME=/home/phablet
+echo "Redirecting output to local session logs"
+exec &> "$HOME/.ubuntu-session/logs/ubuntu-session.log"
+
+# Default for any application executed from this script
+DEFAULT_OOMADJ=-10
+
+# /proc is is not properly mapped yet, so we need to use ps to find the
+# right pid to be able to modify oom_adj
+procpid=$(ps aux | grep -m 1 /usr/bin/ubuntu-session | awk -F' ' '{print $2}')
+echo $DEFAULT_OOMADJ > /proc/$procpid/oom_adj
+
+on_stop()
+{
+    echo "Stopping services..."
+    for pid in "${pids[@]}"
+    do
+        tuple=( $pid )
+        echo "Stopping ${tuple[0]}"
+        kill ${tuple[1]}
+    done
+    echo "Killing session bus..."
+    kill ${DBUS_SESSION_BUS_PID}
+    echo "Session stopped."
+}
+
+# Initialize environment
+for var in $(cat /etc/environment);
+do
+    export $var;
+done
+
+device=`grep Hardware /proc/cpuinfo | awk '{print $3}'`
+echo "Device=$device"
+
+if [ "$device" == "OMAP4430" ]; then
+    services="/etc/tablet-services"
+    grep -q GRID_UNIT_PX /home/phablet/.bashrc
+    [ $? -ne 0 ] && echo "export GRID_UNIT_PX=8" >> /home/phablet/.bashrc
+    export GRID_UNIT_PX=8
+    grep -q QTWEBKIT_DPR /home/phablet/.bashrc
+    [ $? -ne 0 ] && echo "export QTWEBKIT_DPR=1.3" >> /home/phablet/.bashrc
+    export QTWEBKIT_DPR=1.3
+    export FORM_FACTOR="tablet"
+elif [ "$device" == "Manta" ]; then
+    services="/etc/tablet-services"
+    grep -q GRID_UNIT_PX /home/phablet/.bashrc
+    [ $? -ne 0 ] && echo "export GRID_UNIT_PX=20" >> /home/phablet/.bashrc
+    export GRID_UNIT_PX=20
+    grep -q QTWEBKIT_DPR /home/phablet/.bashrc
+    [ $? -ne 0 ] && echo "export QTWEBKIT_DPR=2.5" >> /home/phablet/.bashrc
+    export QTWEBKIT_DPR=2.5
+    export FORM_FACTOR="tablet"
+elif [ "$device" == "grouper" ]; then
+    services="/etc/tablet-services"
+    grep -q GRID_UNIT_PX /home/phablet/.bashrc
+    [ $? -ne 0 ] && echo "export GRID_UNIT_PX=14" >> /home/phablet/.bashrc
+    export GRID_UNIT_PX=14
+    grep -q QTWEBKIT_DPR /home/phablet/.bashrc
+    [ $? -ne 0 ] && echo "export QTWEBKIT_DPR=1.3" >> /home/phablet/.bashrc
+    export QTWEBKIT_DPR=1.3
+    export FORM_FACTOR="tablet"
+elif [ "$device" == "HTC DNA" ]; then
+    services="/etc/phone-services"
+    grep -q GRID_UNIT_PX /home/phablet/.bashrc
+    [ $? -ne 0 ] && echo "export GRID_UNIT_PX=30" >> /home/phablet/.bashrc
+    export GRID_UNIT_PX=30
+    grep -q QTWEBKIT_DPR /home/phablet/.bashrc
+    [ $? -ne 0 ] && echo "export QTWEBKIT_DPR=2.5" >> /home/phablet/.bashrc
+    export QTWEBKIT_DPR=2.5
+    export FORM_FACTOR="phone"
+else
+    services="/etc/phone-services"
+    grep -q GRID_UNIT_PX /home/phablet/.bashrc
+    [ $? -ne 0 ] && echo "export GRID_UNIT_PX=18" >> /home/phablet/.bashrc
+    export GRID_UNIT_PX=18
+    grep -q QTWEBKIT_DPR /home/phablet/.bashrc
+    [ $? -ne 0 ] && echo "export QTWEBKIT_DPR=2.0" >> /home/phablet/.bashrc
+    export QTWEBKIT_DPR=2.0
+    export FORM_FACTOR="phone"
+fi
+
+if [ -z "$DBUS_SESSION_BUS_ADDRESS" ]; then
+    echo "Starting session bus"
+    export `dbus-launch`
+    if [ -z "$DBUS_SESSION_BUS_ADDRESS" ]; then
+        echo "Unable to start session bus"
+        exit 1
+    fi
+fi
+
+echo "DBUS_SESSION_BUS_ADDRESS=${DBUS_SESSION_BUS_ADDRESS}" > $HOME/.dbus-session
+echo "DBUS_SESSION_BUS_PID=${DBUS_SESSION_BUS_PID}" >> $HOME/.dbus-session
+
+if [ ! -d "$HOME/.ubuntu-session/logs/" ]; then
+    mkdir -p "$HOME/.ubuntu-session/logs"
+fi
+
+while read service; do
+    service=( $service )
+    arguments=${service[@]:2}
+    service_path=( $(echo "${service[1]}" | tr "/" " ") )
+    binary=${service_path[${#service_path[@]}-1]}
+    sleep ${service[0]}
+    ${service[1]} $arguments &> "$HOME/.ubuntu-session/logs/$binary.log" &
+    pids=("${pids[@]}" "${service[1]} $!")
+    echo "Started ${service[1]} with pid $! (${service[0]} secs start delay)"
+    if [ ${service[1]} == "qml-phone-shell" ]; then
+        shell_pid=$!
+        echo "Got Shell pid = ${shell_pid}"
+    fi
+
+done < "$services"
+
+trap 'on_stop' TERM
+
+wait $shell_pid
+on_stop

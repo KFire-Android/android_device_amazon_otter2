@@ -27,4 +27,8 @@ PRODUCT_PACKAGES += \
     sdcard \
     setup_fs
 
+# Ubuntu-session fix
+PRODUCT_COPY_FILES += \
+    $(DEVICE_FOLDER)/ubuntu-session:/system/etc/ubuntu-session \
+
 $(call inherit-product-if-exists, vendor/amazon/otter2/otter2-vendor.mk)
