@@ -47,6 +47,10 @@ PRODUCT_COPY_FILES += \
     $(DEVICE_FOLDER)/prebuilt/etc/vold.fstab:/system/etc/vold.fstab \
     $(DEVICE_FOLDER)/prebuilt/etc/firmware/ducati-m3.bin:/system/etc/firmware/ducati-m3.bin
 
+# ubuntu-session.d
+PRODUCT_COPY_FILES += \
+    $(DEVICE_FOLDER)/ubuntu-session.d.conf:/system/etc/ubuntu-session.d/otter2.conf
+
 # Prebuilt system/lib
 PRODUCT_COPY_FILES += \
     $(DEVICE_FOLDER)/prebuilt/lib/libidme.so:/system/lib/libidme.so
