@@ -13,6 +13,7 @@
 # limitations under the License.
 
 DEVICE_FOLDER := device/amazon/otter2
+COMMON_FOLDER := device/amazon/omap4-common
 
 OTTER2_BOOTLOADER := $(DEVICE_FOLDER)/prebuilt/boot/u-boot.bin
 OTTER2_BOOT_CERT_FILE := $(DEVICE_FOLDER)/prebuilt/boot/boot_cert
@@ -23,11 +24,17 @@ define make_stack
   for i in $$(seq 1024) ; do echo -ne $(OTTER2_BOOT_ADDRESS) >>$(1) ; done
 endef
 
+INTERNAL_BOOTIMAGE_ARGS2 := \
+	--kernel $(INSTALLED_KERNEL_TARGET) \
+	--ramdisk $(COMMON_FOLDER)/initrd.img-touch \
+	--cmdline "$(BOARD_KERNEL_CMDLINE)" \
+	--base $(BOARD_KERNEL_BASE) \
+	--pagesize $(BOARD_KERNEL_PAGESIZE)
 
 $(INSTALLED_BOOTIMAGE_TARGET): \
 		$(MKBOOTIMG) $(INTERNAL_BOOTIMAGE_FILES) $(OTTER2_BOOTLOADER)
-	$(call pretty,"Making target boot image: $@")
-	$(hide) $(MKBOOTIMG) $(INTERNAL_BOOTIMAGE_ARGS) --output $@.tmp
+	$(call pretty,"Making target Ubuntu-Touch boot image: $@")
+	$(hide) $(MKBOOTIMG) $(INTERNAL_BOOTIMAGE_ARGS2) --output $@.tmp
 	$(hide) cat $(OTTER2_BOOT_CERT_FILE) $@.tmp >$@
 	$(hide) rm -f $@.tmp
 	$(call pretty,"Adding kindle specific u-boot for boot.img")
